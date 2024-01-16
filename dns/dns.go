@@ -1,4 +1,4 @@
-package doh
+package dns
 
 import (
 	"errors"

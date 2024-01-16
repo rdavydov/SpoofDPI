@@ -5,8 +5,9 @@ import (
 	"os"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/xvzc/SpoofDPI/net/http"
+	"github.com/xvzc/SpoofDPI/net/https"
 	"github.com/xvzc/SpoofDPI/net"
-	"github.com/xvzc/SpoofDPI/packet"
 	"github.com/xvzc/SpoofDPI/util"
 )
 
@@ -40,10 +41,10 @@ func (p *Proxy) Start() {
 	}
 
 	if p.timeout > 0 {
-        log.Println(fmt.Sprintf("Connection timeout is set to %dms", p.timeout))
-    }
+		log.Println(fmt.Sprintf("Connection timeout is set to %dms", p.timeout))
+	}
 
-    log.Println("Created a listener on port", p.Port())
+	log.Println("Created a listener on port", p.Port())
 
 	for {
 		conn, err := l.Accept()
@@ -60,23 +61,21 @@ func (p *Proxy) Start() {
 
 			log.Debug("[PROXY] Request from ", conn.RemoteAddr(), "\n\n", string(b))
 
-			pkt, err := packet.NewHttpPacket(b)
+			r, err := http.ParseRequest(b)
 			if err != nil {
 				log.Debug("Error while parsing request: ", string(b))
 				return
 			}
 
-			if !pkt.IsValidMethod() {
-				log.Debug("Unsupported method: ", pkt.Method())
+			if !r.IsValidMethod() {
+				log.Debug("Unsupported method: ", r.Method())
 				return
 			}
 
-			if pkt.IsConnectMethod() {
-				log.Debug("[HTTPS] Start")
-				conn.HandleHttps(pkt, p.timeout)
+			if r.IsConnectMethod() {
+				https.Handle(conn, r, p.timeout)
 			} else {
-				log.Debug("[HTTP] Start")
-				conn.HandleHttp(pkt, p.timeout)
+				http.Handle(conn, r, p.timeout)
 			}
 		}()
 	}

@@ -1,4 +1,4 @@
-package packet
+package http
 
 import (
 	"bufio"
@@ -43,7 +43,7 @@ var validMethod = map[string]struct{}{
 	"UNLINK":      {},
 }
 
-type HttpPacket struct {
+type HttpRequest struct {
 	raw     []byte
 	method  string
 	domain  string
@@ -52,38 +52,62 @@ type HttpPacket struct {
 	version string
 }
 
-func ParseUrl(raw []byte) {
+func ParseRequest(raw []byte) (*HttpRequest, error) {
+	r := &HttpRequest{raw: raw}
 
+	reader := bufio.NewReader(strings.NewReader(string(r.raw)))
+	request, err := http.ReadRequest(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	r.domain, r.port, err = net.SplitHostPort(request.Host)
+	if err != nil {
+		r.domain = request.Host
+		r.port = ""
+	}
+
+	r.method = request.Method
+	r.version = request.Proto
+	r.path = request.URL.Path
+
+	if request.URL.RawQuery != "" {
+		r.path += "?" + request.URL.RawQuery
+	}
+
+	if request.URL.RawFragment != "" {
+		r.path += "#" + request.URL.RawFragment
+	}
+
+	if r.path == "" {
+		r.path = "/"
+	}
+
+	request.Body.Close()
+
+	return r, nil
 }
 
-func NewHttpPacket(raw []byte) (*HttpPacket, error) {
-	pkt := &HttpPacket{raw: raw}
-
-	pkt.parse()
-
-	return pkt, nil
-}
-
-func (p *HttpPacket) Raw() []byte {
+func (p *HttpRequest) Raw() []byte {
 	return p.raw
 }
-func (p *HttpPacket) Method() string {
+func (p *HttpRequest) Method() string {
 	return p.method
 }
 
-func (p *HttpPacket) Domain() string {
+func (p *HttpRequest) Domain() string {
 	return p.domain
 }
 
-func (p *HttpPacket) Port() string {
+func (p *HttpRequest) Port() string {
 	return p.port
 }
 
-func (p *HttpPacket) Version() string {
+func (p *HttpRequest) Version() string {
 	return p.version
 }
 
-func (p *HttpPacket) IsValidMethod() bool {
+func (p *HttpRequest) IsValidMethod() bool {
 	if _, exists := validMethod[p.Method()]; exists {
 		return true
 	}
@@ -91,11 +115,11 @@ func (p *HttpPacket) IsValidMethod() bool {
 	return false
 }
 
-func (p *HttpPacket) IsConnectMethod() bool {
+func (p *HttpRequest) IsConnectMethod() bool {
 	return p.Method() == "CONNECT"
 }
 
-func (p *HttpPacket) Tidy() {
+func (p *HttpRequest) Tidy() {
 	s := string(p.raw)
 
 	lines := strings.Split(s, "\r\n")
@@ -121,37 +145,4 @@ func (p *HttpPacket) Tidy() {
 	result += "\r\n"
 
 	p.raw = []byte(result)
-}
-
-func (p *HttpPacket) parse() error {
-	reader := bufio.NewReader(strings.NewReader(string(p.raw)))
-	request, err := http.ReadRequest(reader)
-	if err != nil {
-		return err
-	}
-
-	p.domain, p.port, err = net.SplitHostPort(request.Host)
-	if err != nil {
-		p.domain = request.Host
-		p.port = ""
-	}
-
-	p.method = request.Method
-	p.version = request.Proto
-	p.path = request.URL.Path
-
-	if request.URL.RawQuery != "" {
-		p.path += "?" + request.URL.RawQuery
-	}
-
-	if request.URL.RawFragment != "" {
-		p.path += "#" + request.URL.RawFragment
-	}
-	if p.path == "" {
-		p.path = "/"
-	}
-
-	request.Body.Close()
-
-	return nil
 }

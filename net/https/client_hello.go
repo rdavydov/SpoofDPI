@@ -1,4 +1,4 @@
-package packet
+package https
 
 import (
 	"github.com/xvzc/SpoofDPI/util"
@@ -8,7 +8,7 @@ type HttpsPacket struct {
 	raw []byte
 }
 
-func NewHttpsPacket(raw []byte) HttpsPacket {
+func ParseClientHello(raw []byte) HttpsPacket {
 	return HttpsPacket{
 		raw: raw,
 	}
